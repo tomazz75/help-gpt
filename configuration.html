@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f8ff;
+        }
+        h1 {
+            color: #2f4f4f;
+        }
+        label {
+            color: #2f4f4f;
+            margin-bottom: 5px;
+            display: block;
+        }
+           input[type="text"], select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            margin: 5px; 
+              max-width: 200px;
+              box-sizing: border-box;
+              
+            border-radius: 4px;
+        }
+        .channels-container {
+            display: flex;
+            
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .date-time-pair-container{
+             display: flex;
+            align-items: center;
+        } 
+         .date-time-pair { display: flex; align-items: center; }
+        
+         .date-time-picker-wrapper {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 5px;
+              
+         }
+        .date-time-input-container {
+            display: flex;
+           gap: 120px; /* Increased gap */
+           align-items: center;
+        }
+
+        .remove-pair-button {
+            background-color: #f08080;
+            
+        }
+        .button-container{
+            margin-left: 10px;
+        }
+        input[type="text"], select, button {
+           padding: 10px 15px;
+            border: none;
+           margin-bottom:5px;
+            border-radius: 4px;
+        }
+        .add-hours-button{
+            background-color: #4CAF50; /* Green */
+            cursor: pointer;
+            margin-bottom: 5px;
+        }       
+
+        #saveResultModal {
+            display: none;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+         #messageModal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            
+            z-index: 10;
+        }
+     
+    </style>
+</head>
+<body>
+<div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h1 style="margin-bottom:20px">Dodajanje temnitve</h1>
+        
+        <div id="dateTimePairsContainer">
+        </div>
+        <div style="margin-bottom:20px; margin-top:20px">
+            <div class="button-container">
+                <button id="addDateTimePairButton" style="background-color: #4CAF50; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer;">+</button>
+                <button id="removeDateTimePairButton" style="background-color: #f08080; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; margin-left:5px;" disabled>-</button>
+            </div>
+            <div class="channels-container">
+                <div >
+                    <label for="availableChannels">Kanali:</label>
+                    <select id="availableChannels" multiple size="10" style="width: 200px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin: 5px; ">
+                        {% for channel in channels %}
+                        <option value="{{ channel.id }}">{{ channel.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div >
+                    <label for="selectedChannels">Izbrani:</label>
+                    <select id="selectedChannels" multiple size="10" style="width: 200px">
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div style="display: flex; align-items: center; gap:20px;">
+            <button onclick="saveFile()" style="padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; margin-top:0;">Shrani</button>
+            <a href="/" style="background-color: #4682b4; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; margin-top:0;">Domov</a>
+        </div>
+        
+        <!-- Modal for displaying save results -->
+        <div id="saveResultModal">
+            <div><p id="saveResultMessage"></p><button id="closeModalButton" >Close</button>
+            </div>
+          </div>
+          <script>
+              const modal = document.getElementById('saveResultModal');
+
+              const closeModalButton = document.getElementById('closeModalButton');
+              closeModalButton.onclick = function() {
+                modal.style.display = "none";
+            }
+            const messageModal = document.createElement('div');
+            messageModal.id = 'messageModal';
+            messageModal.innerHTML = '<div style="background-color:white; margin:15% auto; padding:20px; border:1px solid #888; width:80%;"><p id="messageContent"></p><button id="closeMessageButton" style="background-color: #4682b4; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;">Zapri</button></div>';
+            document.body.appendChild(messageModal);
+            const closeMessageButton = document.getElementById('closeMessageButton');
+            closeMessageButton.onclick = function() {
+                messageModal.style.display = 'none';
+            }
+
+         </script>
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
+
+        <script>
+        
+            function setupDateTimePair(pairDiv){
+                 const startPickerInput = pairDiv.querySelector('[name="dateTime"]');
+                 const stopPickerInput = pairDiv.querySelector('[name="stopDateTime"]');
+
+                 if (startPickerInput && stopPickerInput) {
+                    startPickerInput._flatpickr = flatpickr(startPickerInput, {
+                        enableTime: true,
+                        dateFormat: "Y-m-d H:i",
+                        time_24hr: true
+                    });
+                    stopPickerInput._flatpickr = flatpickr(stopPickerInput, {
+                        enableTime: true,
+                        dateFormat: "Y-m-d H:i",
+                        time_24hr: true
+                     });
+                }
+           }
+           
+           function addHours(pairDiv, hours) {
+             const startPicker = pairDiv.querySelector('[name="dateTime"]')._flatpickr;
+            const stopPicker = pairDiv.querySelector('[name="stopDateTime"]')._flatpickr;
+            
+            if (!startPicker || !stopPicker || startPicker.selectedDates.length === 0) {
+                 console.log("Start date not selected or flatpickr not initialized.");
+                 return;
+             }
+             const startDate = new Date(startPicker.selectedDates[0]);
+             const newStopDate = new Date(startDate.getTime() + hours * 60 * 60 * 1000);
+             
+             stopPicker.setDate(newStopDate, true); // Set the stop date and update the input
+             const stopPickerInput = pairDiv.querySelector('[name="stopDateTime"]');
+             stopPickerInput.value=stopPicker.input.value;
+             
+             
+             
+             
+         }
+            function createDateTimePair() {
+                const pairDiv = document.createElement('div');
+                pairDiv.className = 'date-time-pair';
+                pairDiv.innerHTML = `
+                        <div class="date-time-input-container">
+                            <div class="date-time-picker-wrapper">
+                                <label>Začetek:</label>
+                                <input type="text" name="dateTime" class="flatpickr">
+                            </div>
+                            <div class="date-time-picker-wrapper">
+                                <label>Konec:</label>
+                                <input type="text" name="stopDateTime" class="flatpickr">
+                                <div style="margin-top: 5px; margin-bottom: 5px">
+                                <button type="button" class="add-hours-button" data-hours="1">+1h</button>
+                                <button type="button" class="add-hours-button" data-hours="2">+2h</button>
+                                <button type="button" class="add-hours-button" data-hours="3">+3h</button>
+                            </div>
+                        </div>
+                       `;
+
+                
+                const addHourButtons = pairDiv.querySelectorAll('.add-hours-button');
+                addHourButtons.forEach(button => {
+                    button.addEventListener('click', function(event) {
+                        
+                        if (event.target.classList.contains('add-hours-button')) {
+                            const pairDiv = event.target.closest('.date-time-pair');
+                            const hoursToAdd = parseInt(event.target.getAttribute('data-hours'));
+                            addHours(pairDiv, hoursToAdd);
+                        }
+                    });
+                    
+                    
+                    
+                });
+                return pairDiv;
+            }
+           
+           
+         
+          document.addEventListener('DOMContentLoaded', function() {
+              
+            const dateTimePairsContainer = document.getElementById('dateTimePairsContainer');
+            const removeDateTimePairButton = document.getElementById('removeDateTimePairButton');
+             
+            const pairDiv = createDateTimePair()
+            dateTimePairsContainer.appendChild(pairDiv);
+             if (pairDiv) {
+                 // Target the existing '-' button and hide it for the first pair
+                 
+                 const removeButton = document.getElementById('removeDateTimePairButton');
+                 if (removeButton) {
+                     removeButton.style.display = 'none';
+                 }
+                 
+
+
+                 setupDateTimePair(pairDiv);
+             }
+              
+
+              
+               const availableChannels = document.getElementById('availableChannels');
+
+                const selectedChannels = document.getElementById('selectedChannels');
+
+                if (availableChannels && selectedChannels) {
+                    availableChannels.addEventListener('click', function(event) {
+                        if (event.target.tagName === 'OPTION') {
+                          moveOption(availableChannels, selectedChannels, event.target);
+                        }
+                    });
+
+                    selectedChannels.addEventListener('click', function(event) {
+                        if (event.target.tagName === 'OPTION') {
+                            moveOption(selectedChannels, availableChannels, event.target);
+                        }
+                    });
+                }
+
+                const addDateTimePairButton = document.getElementById('addDateTimePairButton');
+                if(addDateTimePairButton){
+                    addDateTimePairButton.addEventListener('click', function() {
+                        const dateTimePairs = document.querySelectorAll('.date-time-pair');
+                         const lastPair = dateTimePairs[dateTimePairs.length - 1];
+
+                         const startPickerInput = lastPair.querySelector('[name="dateTime"]');
+                         const stopPickerInput = lastPair.querySelector('[name="stopDateTime"]');
+                         
+                        if (startPickerInput && stopPickerInput && startPickerInput._flatpickr && stopPickerInput._flatpickr &&
+                         startPickerInput._flatpickr.selectedDates.length > 0 && stopPickerInput._flatpickr.selectedDates.length > 0) {
+                             const pairDiv = createDateTimePair();
+                             dateTimePairsContainer.appendChild(pairDiv);
+                              const removeButton = document.getElementById('removeDateTimePairButton');
+                                if(removeButton){
+                                  removeButton.style.display='block';
+                                setupDateTimePair(pairDiv);
+                                
+                            }else{
+                                
+                                
+                                
+                                const removeButton = document.getElementById('removeDateTimePairButton');
+                                if(removeButton){
+                                    removeButton.style.display='none';
+                                }
+
+                            const messageModal = document.getElementById('messageModal');
+                             const messageContent = document.getElementById('messageContent');                             
+                             messageContent.textContent = 'Prejšnja temnitev ni določena';
+                             messageModal.style.display = 'block';
+                         }                    })
+                    
+                    }
+
+                    if(removeDateTimePairButton){
+                         removeDateTimePairButton.addEventListener('click', () => {
+                             const dateTimePairs = document.querySelectorAll('.date-time-pair');
+                             
+                            if (dateTimePairs.length > 1) {
+                                // Remove the last pair
+                                dateTimePairs[dateTimePairs.length - 1].remove();
+                            }
+                            
+                             
+                             // Check again if there's only one pair left after removal
+                             if (dateTimePairs.length === 2) {
+                                 
+                                 removeDateTimePairButton.style.display = 'none';
+                             }
+                             // Enable the button if there's more than one pair   
+                         });
+                     }else{
+                     }
+
+            removeDateTimePairButton.style.display = 'none';
+            removeDateTimePairButton.disabled = false;
+          }
+            });
+         
+
+
+       </script>
+        <script>
+            function moveOption(from, to, option) {
+                to.appendChild(option);
+            }
+        </script>
+    </div>
+    <script>
+        
+         function saveFile() {
+            const modal = document.getElementById('saveResultModal');
+            const messageElement = document.getElementById('saveResultMessage');
+
+            setTimeout(() => {
+                function formatDateTime(date) {
+                    const year = date.getFullYear();
+                    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                    const day = date.getDate().toString().padStart(2, '0');       
+                    const hours = date.getHours().toString().padStart(2, '0');   
+                    const minutes = date.getMinutes().toString().padStart(2, '0'); 
+                    return `${year}-${month}-${day} ${hours}:${minutes}`;//24 hours format       
+                }       
+                const dateTimePairsContainer = document.getElementById('dateTimePairsContainer');       
+                const dateTimePairs = Array.from(dateTimePairsContainer.querySelectorAll('.date-time-pair'));       
+
+                const pairs = dateTimePairs.map(pair => {
+                    const startPickerInput = pair.querySelector('input[name="dateTime"]');
+                    const stopPickerInput = pair.querySelector('input[name="stopDateTime"]');
+                    if (!startPickerInput || !stopPickerInput) { return null; }
+                    if (!startPickerInput._flatpickr || !stopPickerInput._flatpickr) { return null; }
+                    const startPicker = startPickerInput._flatpickr;
+                    const stopPicker = stopPickerInput._flatpickr;
+                    if (startPicker.selectedDates.length === 0 || stopPicker.selectedDates.length === 0) {
+                        return null;
+                    }
+
+
+                    return {
+                        start: startPicker.selectedDates[0],
+                        stop: stopPicker.selectedDates[0],
+                    };
+                }).filter(pair => pair !== null);
+
+                
+                pairs.sort((a, b) => a.start - b.start);         
+
+                for (let i = 0; i < pairs.length - 1; i++) {
+                    if (pairs[i].stop > pairs[i + 1].start) {
+                        messageElement.textContent = "temnitve se prekrivajo";
+                        modal.style.display = 'block';
+                        return;
+                    }
+                }
+                
+                const eventData = [];       
+                for (const pair of dateTimePairs) {
+                    
+                    let startPicker = null;
+                    let stopPicker = null;
+                    const inputs = pair.querySelectorAll('input');
+
+                    for (const input of inputs) {
+                        if (input.name === 'dateTime') {
+                            startPicker = input;
+                        } else if (input.name === 'stopDateTime') {
+                            stopPicker = input;
+                        }
+                    }
+
+                    if (!startPicker || !stopPicker) {
+                        messageElement.textContent = "Could not find date/time input elements.";
+                        modal.style.display = 'block';
+                        
+                        return;
+                    }
+                    modal.style.display = 'block';
+
+                   const startPickerInstance = startPicker._flatpickr;
+                   const stopPickerInstance = stopPicker._flatpickr;
+
+
+                   if (!startPickerInstance) {
+                        messageElement.textContent = "Please select a start date and time.";
+                        modal.style.display = 'block';
+                        return;
+                    }
+                    if (!stopPickerInstance) {
+                        messageElement.textContent = "Please select a stop date and time.";
+                     modal.style.display = 'block';
+                        return;
+                    }                  
+                    if (!startPickerInstance.selectedDates.length || !stopPickerInstance.selectedDates.length) {
+                        messageElement.textContent = "Please select a start and stop date and time.";
+                        modal.style.display = 'block';
+                        return;
+                    }
+
+                    const selectedDateTime = startPickerInstance.selectedDates[0];
+                    if (selectedDateTime < new Date()) {
+                        messageElement.textContent = "Start Date/Time cannot be in the past.";
+                        modal.style.display = 'block';
+                        return;
+                    }
+                    const selectedStopDateTime = stopPickerInstance.selectedDates[0];
+                    if (!selectedStopDateTime) {
+                         messageElement.textContent = "Please select a stop date and time.";
+                        return;
+                    }
+                    if (isNaN(selectedDateTime.getTime()) || isNaN(selectedStopDateTime.getTime())) {
+                        messageElement.textContent = "Please select a valid start and stop date and time.";
+                      modal.style.display = 'block';
+                        return;
+                    }
+                    if (selectedStopDateTime <= selectedDateTime) {
+                        messageElement.textContent = "Stop Date/Time must be after Start Date/Time.";
+                        modal.style.display = 'block';
+                        return;
+                    }
+
+                    eventData.push({
+                        start_time: formatDateTime(startPickerInstance.selectedDates[0]), 
+                        stop_time: formatDateTime(selectedStopDateTime) 
+                    })
+
+                }
+                
+
+                const selectedChannelsList = document.getElementById('selectedChannels');
+                const selectedChannels = Array.from(selectedChannelsList.options).map(option => option.value);
+                if (selectedChannels.length === 0) {
+                    messageElement.textContent = "Please select at least one channel.";
+                   modal.style.display = 'block';
+                    return;
+                }
+                
+                let successfulSaves = 0;       
+                let failedSaves = [];       
+                
+                const config = { 
+                    channels: selectedChannels, 
+                    events: eventData 
+                };       
+                
+                fetch('/save_config', {  
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(config),
+                }) 
+                .then(response => response.json()) 
+                
+                .then(data => { 
+                     messageElement.textContent = data.message; 
+                    modal.style.display = 'block'; 
+                    let message = ""; // Initialize the message variable
+                    // Clear the date time pairs
+                    while(dateTimePairsContainer.firstChild){
+                        dateTimePairsContainer.removeChild(dateTimePairsContainer.firstChild);
+                    }
+                    const pairDiv = createDateTimePair()
+                    dateTimePairsContainer.appendChild(pairDiv);
+                    
+                    if (pairDiv) setupDateTimePair(pairDiv);
+                    
+                    // Clear selectedChannels and move all options back to availableChannels
+                    const selectedChannelsList = document.getElementById('selectedChannels');
+                    const availableChannelsList = document.getElementById('availableChannels');
+                    while (selectedChannelsList.firstChild) {
+                        availableChannelsList.appendChild(selectedChannelsList.firstChild);
+                    }
+                        
+                       if (successfulSaves.length > 0) {
+                           message += "Successfully saved:\n" + successfulSaves.join("\n") + "\n";
+                       }
+
+
+                       if (failedSaves.length > 0) {
+                           message += "Failed to save:\n";
+                           failedSaves.forEach((failure) => {
+                               message += `${failure.filename} (Reason: ${failure.reason})\n`;
+                           });
+                       }
+                       if (message.length === 0) {
+                           message = "Temnitve dodane";
+                       }
+                       messageElement.textContent = message;
+
+                    const closeModalButton = document.getElementById('closeModalButton');
+                    closeModalButton.id = 'closeModalButton';
+                    closeModalButton.textContent = 'Close';
+                    closeModalButton.style.cssText = 'background-color: #4682b4; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;';
+                    modal.style.display = 'block';
+                })
+                .then(()=>{
+                  fetch('/add_event', { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ channels: selectedChannels, events: eventData }),
+                })
+                .catch(error => {
+                         console.error('Error sending event:', error);
+                      });
+
+                    })
+                .catch((error)=>{
+                    console.error('Error:', error);
+                    messageElement.textContent = 'An error occurred while saving the configuration.';
+                    modal.style.display = 'block';
+                });
+            }, 100);
+        }
+        
+    </script> 
+    
+</body>
+</html>
